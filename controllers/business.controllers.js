@@ -1,6 +1,7 @@
 import Business from "../models/business.js";
 import User from "../models/users.js";
 import slugify from "slugify";
+import mongoose from "mongoose";
 
 // Public: Search businesses with filters + pagination
 export const searchBusinesses = async (req, res) => {
@@ -17,7 +18,7 @@ export const searchBusinesses = async (req, res) => {
           state: new RegExp(`^${state}$`, "i"),
           lga: new RegExp(`^${lga}$`, "i"),
           town: new RegExp(`^${town}$`, "i"),
-          category: new RegExp(`^${category}$`, "i"),
+          categories: { $regex: new RegExp(`^${category}$`, "i") },
      };
 
      const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -82,20 +83,11 @@ export const createBusiness = async (req, res) => {
           });
      }
 
-     const {
-          business_name,
-          phone,
-          categories,
-          state,
-          lga,
-          town,
-          address,
-          store_type,
-          description,
-     } = req.body;
+     const { businessName, phone, categories, state, lga, town, address, store_type, description } =
+          req.body;
 
      if (
-          !business_name ||
+          !businessName ||
           !phone ||
           !categories ||
           !state ||
@@ -125,11 +117,11 @@ export const createBusiness = async (req, res) => {
           });
      }
 
-     const slug = slugify(business_name, { lower: true, strict: true });
+     const slug = slugify(businessName, { lower: true, strict: true });
 
      try {
           const business = new Business({
-               business_name,
+               businessName,
                phone,
                categories,
                state,
@@ -166,9 +158,25 @@ export const createBusiness = async (req, res) => {
 
 //  Auth: Get your own business
 export const getMyBusiness = async (req, res) => {
-     const { slug } = req.params;
+     const userID = req.user.id;
+     console.log("userID from token:", userID);
+
+     if (!userID) {
+          return res.status(401).json({
+               success: false,
+               message: "Unauthorized: No user ID found in token",
+          });
+     }
+
+     if (!mongoose.Types.ObjectId.isValid(userID)) {
+          return res.status(400).json({
+               success: false,
+               message: "Invalid user ID format",
+          });
+     }
+
      try {
-          const business = await Business.findOne({ slug });
+          const business = await Business.findOne({ owner: new mongoose.Types.ObjectId(userID) });
 
           if (!business) {
                return res.status(404).json({
@@ -182,7 +190,7 @@ export const getMyBusiness = async (req, res) => {
                business,
           });
      } catch (err) {
-          console.error(err);
+          console.error("getMyBusiness error:", err);
           return res.status(500).json({
                success: false,
                message: "Server Error",
@@ -196,7 +204,8 @@ export const updateBusiness = async (req, res) => {
     const userID = req.user.id;
 
     try {
-        const existing = await Business.findOne({ slug, owner: userID });
+        // Find existing business by slug and owner to verify ownership and existence
+        const existing = await Business.findOne({ owner: new mongoose.Types.ObjectId(userID) });
         if (!existing) {
             return res.status(404).json({
                 success: false,
@@ -205,7 +214,7 @@ export const updateBusiness = async (req, res) => {
         }
 
         const {
-            business_name,
+            businessName,
             phone,
             categories,
             state,
@@ -216,56 +225,67 @@ export const updateBusiness = async (req, res) => {
             description,
         } = req.body;
 
-        if (
-            !business_name ||
-            !phone ||
-            !categories ||
-            !state ||
-            !lga ||
-            !town ||
-            !address ||
-            !store_type
-        ) {
+        // Prepare update object
+        const updateFields = {};
+
+        if (businessName !== undefined) {
+            updateFields.businessName = businessName;
+        }
+        if (phone !== undefined) {
+            const phoneRegex = /^\d{11}$/;
+            if (!phoneRegex.test(phone)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Phone number must be exactly 11 digits",
+                });
+            }
+            updateFields.phone = phone;
+        }
+        if (categories !== undefined) {
+            updateFields.categories = categories;
+        }
+        if (state !== undefined) {
+            updateFields.state = state;
+        }
+        if (lga !== undefined) {
+            updateFields.lga = lga;
+        }
+        if (town !== undefined) {
+            updateFields.town = town;
+        }
+        if (address !== undefined) {
+            updateFields.address = address;
+        }
+        if (store_type !== undefined) {
+            if (!["physical", "online"].includes(store_type)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Store type must be 'physical' or 'online'",
+                });
+            }
+            updateFields.store_type = store_type;
+        }
+        if (description !== undefined) {
+            updateFields.description = description;
+        }
+
+        // If businessName is updated, generate new slug
+        if (businessName && businessName !== existing.businessName) {
+            updateFields.slug = slugify(businessName, { lower: true, strict: true });
+        }
+
+        // If no fields provided to update
+        if (Object.keys(updateFields).length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "All required fields must be filled",
+                message: "No valid fields provided to update",
             });
         }
 
-        const phoneRegex = /^\d{11}$/;
-        if (!phoneRegex.test(phone)) {
-            return res.status(400).json({
-                success: false,
-                message: "Phone number must be exactly 11 digits",
-            });
-        }
-
-        if (!["physical", "online"].includes(store_type)) {
-            return res.status(400).json({
-                success: false,
-                message: "Store type must be 'physical' or 'online'",
-            });
-        }
-
-        const newSlug =
-            business_name !== existing.business_name
-                ? slugify(business_name, { lower: true, strict: true })
-                : existing.slug;
-
+        // Perform update
         const updated = await Business.findOneAndUpdate(
-            { slug, owner: userID },
-            {
-                business_name,
-                phone,
-                categories,
-                state,
-                lga,
-                town,
-                address,
-                store_type,
-                description,
-                slug: newSlug,
-            },
+            { owner: new mongoose.Types.ObjectId(userID) },
+            updateFields,
             { new: true, runValidators: true }
         );
 
@@ -288,21 +308,21 @@ export const updateBusiness = async (req, res) => {
         });
     }
 };
+
 export const deleteAccount = async (req, res) => {
-    try {
-        await Business.findOneAndDelete({ owner: req.user.id });
-        await User.findByIdAndDelete(req.user.id);
+     try {
+          await Business.findOneAndDelete({ owner: req.user.id });
+          await User.findByIdAndDelete(req.user.id);
 
-        return res.status(200).json({
-            success: true,
-            message: "Account and business deleted",
-        });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({
-            success: false,
-            message: "Failed to delete account",
-        });
-    }
+          return res.status(200).json({
+               success: true,
+               message: "Account and business deleted",
+          });
+     } catch (err) {
+          console.error(err);
+          return res.status(500).json({
+               success: false,
+               message: "Failed to delete account",
+          });
+     }
 };
-

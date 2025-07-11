@@ -53,10 +53,10 @@ export const Login = async (req, res) => {
           if (!isMatchPassword) {
                return res.status(400).json({ success: false, message: "Wrong Password" });
           }
-          const accessToken = jwt.sign({ userID: user._id }, process.env.JWT_ACCESS_SECRET, {
+          const accessToken = jwt.sign({ id: user._id }, process.env.JWT_ACCESS_SECRET, {
                expiresIn: process.env.JWT_ACCESS_EXPIRES_IN,
           });
-          const refreshToken = jwt.sign({ userID: user._id }, process.env.JWT_REFRESH_SECRET, {
+          const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_REFRESH_SECRET, {
                expiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
           });
           res.cookie("refreshToken", refreshToken, {
