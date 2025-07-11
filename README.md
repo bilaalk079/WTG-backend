@@ -32,16 +32,16 @@ Welcome! This README is designed for **frontend developers** who want to use the
 
 
 # Windows
-# 1. Download MongoDB Community Server from:
-#    https://www.mongodb.com/try/download/community
-# 2. Run the installer and follow prompts:
-#    - Select "Complete" setup
-#    - Choose to install MongoDB as a Windows service
-# 3. Start MongoDB service:
-net start MongoDB
+ 1. Download MongoDB Community Server from:
+    https://www.mongodb.com/try/download/community
+ 2. Run the installer and follow prompts:
+    - Select "Complete" setup
+    - Choose to install MongoDB as a Windows service
+ 3. Start MongoDB service: net start MongoDB
 
-# 4. Verify installation by running in Command Prompt or PowerShell:
-mongo --version
+
+ 4. Verify installation by running in Command Prompt or PowerShell: mongo --version
+
 
 ### Backend Setup
 
