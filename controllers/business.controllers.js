@@ -192,118 +192,117 @@ export const getMyBusiness = async (req, res) => {
 
 //  Auth: Update your business
 export const updateBusiness = async (req, res) => {
-     const { slug } = req.params;
+    const { slug } = req.params;
+    const userID = req.user.id;
 
-     try {
-          const existing = await Business.findOne({ slug: slug });
-          if (!existing) { 
-               return res.status(404).json({
-                    success: false,
-                    message: "No business found to update",
-               });
-          }
+    try {
+        const existing = await Business.findOne({ slug, owner: userID });
+        if (!existing) {
+            return res.status(404).json({
+                success: false,
+                message: "No business found to update or you're not authorized",
+            });
+        }
 
-          const {
-               business_name,
-               phone,
-               categories,
-               state,
-               lga,
-               town,
-               address,
-               store_type,
-               description,
-          } = req.body;
+        const {
+            business_name,
+            phone,
+            categories,
+            state,
+            lga,
+            town,
+            address,
+            store_type,
+            description,
+        } = req.body;
 
-          if (
-               !business_name ||
-               !phone ||
-               !categories ||
-               !state ||
-               !lga ||
-               !town ||
-               !address ||
-               !store_type
-          ) {
-               return res.status(400).json({
-                    success: false,
-                    message: "All required fields must be filled",
-               });
-          }
+        if (
+            !business_name ||
+            !phone ||
+            !categories ||
+            !state ||
+            !lga ||
+            !town ||
+            !address ||
+            !store_type
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "All required fields must be filled",
+            });
+        }
 
-          const phoneRegex = /^\d{11}$/;
-          if (!phoneRegex.test(phone)) {
-               return res.status(400).json({
-                    success: false,
-                    message: "Phone number must be exactly 11 digits",
-               });
-          }
+        const phoneRegex = /^\d{11}$/;
+        if (!phoneRegex.test(phone)) {
+            return res.status(400).json({
+                success: false,
+                message: "Phone number must be exactly 11 digits",
+            });
+        }
 
-          if (!["physical", "online"].includes(store_type)) {
-               return res.status(400).json({
-                    success: false,
-                    message: "Store type must be 'physical' or 'online'",
-               });
-          }
+        if (!["physical", "online"].includes(store_type)) {
+            return res.status(400).json({
+                success: false,
+                message: "Store type must be 'physical' or 'online'",
+            });
+        }
 
-          const newSlug =
-               business_name !== existing.business_name
-                    ? slugify(business_name, { lower: true, strict: true })
-                    : existing.slug;
+        const newSlug =
+            business_name !== existing.business_name
+                ? slugify(business_name, { lower: true, strict: true })
+                : existing.slug;
 
-          const updated = await Business.findOneAndUpdate(
-               { owner: userID },
-               {
-                    business_name,
-                    phone,
-                    categories,
-                    state,
-                    lga,
-                    town,
-                    address,
-                    store_type,
-                    description,
-                    slug: newSlug,
-               },
-               { new: true, runValidators: true }
-          );
+        const updated = await Business.findOneAndUpdate(
+            { slug, owner: userID },
+            {
+                business_name,
+                phone,
+                categories,
+                state,
+                lga,
+                town,
+                address,
+                store_type,
+                description,
+                slug: newSlug,
+            },
+            { new: true, runValidators: true }
+        );
 
-          return res.status(200).json({
-               success: true,
-               message: "Business updated successfully",
-               business: updated,
-          });
-     } catch (err) {
-          console.error(err);
-          if (err.code === 11000) {
-               return res.status(400).json({
-                    success: false,
-                    message: "Business name or phone already exists",
-               });
-          }
-          return res.status(500).json({
-               success: false,
-               message: "Internal Server Error",
-          });
-     }
+        return res.status(200).json({
+            success: true,
+            message: "Business updated successfully",
+            business: updated,
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: "Business name or phone already exists",
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+        });
+    }
 };
-
-//  Auth: Delete account and business
 export const deleteAccount = async (req, res) => {
-     const { slug } = req.params;
-     try {
-          await Business.findOneAndDelete({ slug });
-          await User.findByIdAndDelete(req.user.id);
+    try {
+        await Business.findOneAndDelete({ owner: req.user.id });
+        await User.findByIdAndDelete(req.user.id);
 
-          return res.status(200).json({
-               success: true,
-               message: "Account and business deleted",
-          });
-     } catch (err) {
-          console.error(err);
-          return res.status(500).json({
-               success: false,
-               message: "Failed to delete account",
-          });
-     }
+        return res.status(200).json({
+            success: true,
+            message: "Account and business deleted",
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete account",
+        });
+    }
 };
+
