@@ -1,5 +1,5 @@
 const corsOption = {
-    origin: 'https://front-end-task-hero.vercel.app',
+    origin: 'http://localost:5173',
     methods: 'PUT,DELETE,POST,GET',
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
